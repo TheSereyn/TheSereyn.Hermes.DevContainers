@@ -1,0 +1,4 @@
+# Container root is intentional for rootless bind compatibility.
+# The smoke suite also tests explicit non-root keep-id execution.
+ignored:
+  - DL3002

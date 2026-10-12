@@ -1,0 +1,31 @@
+name: Portable policy validation
+on:
+  pull_request:
+    paths:
+      - 'fedora44-dotnet10/**'
+      - 'tests/**'
+      - '.github/**'
+      - 'docs/**'
+      - 'README.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Source tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/policy-venv"
+          "$RUNNER_TEMP/policy-venv/bin/python" -m pip install -r tests/requirements.txt
+          export PATH="$RUNNER_TEMP/policy-venv/bin:$PATH"
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+      - name: Shell syntax
+        run: |
+          for script in tests/*.sh fedora44-dotnet10/build-local.sh fedora44-dotnet10/tests/smoke.sh; do
+            bash -n "$script" || exit
+          done

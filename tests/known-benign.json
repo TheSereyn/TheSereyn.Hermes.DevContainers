@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "approval": "Project owner approved known-benign exclusion after review; raw findings remain visible.",
+  "reviewed_image_config_sha256": "0dff96899a4526c3054020e9b5e9e49652c325afdc7ec8766468d91c3235cf9c",
+  "policy": "Exact image path, whole-file SHA-256, scanner rule, and count cap must match. Changed content or extra matches require review.",
+  "corpus": [
+    {
+      "path": "usr/lib/node_modules_24/npm/node_modules/@npmcli/arborist/README.md",
+      "sha256": "972e9be5b203202b0341f886ff538bb88cce1caa4a0e8088758047aa83ff7a2e",
+      "rule": "generic-api-key",
+      "count": 3,
+      "reason": "README authentication configuration examples, auth and password fields contain encoded example strings; scoped registry uses an example domain. All three lines match official npm Arborist README exactly."
+    },
+    {
+      "path": "usr/lib/node_modules_24/npm/node_modules/just-diff/index.cjs",
+      "sha256": "1b73ffb5cba2f5ba219ef8fff57f9b34f77d7dd4b0229f6396c022f796e7993d",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "getDiff assigns obj1KeysLength and obj2KeysLength from the length properties of Object.keys arrays. Numeric collection lengths, not credentials."
+    },
+    {
+      "path": "usr/lib/node_modules_24/npm/node_modules/just-diff/index.mjs",
+      "sha256": "2d3eef1b11e8da9dcd695711f8fe468b7320058652196b82290c53321cecfb93",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "ES module counterpart of getDiff; obj1KeysLength and obj2KeysLength are Object.keys array lengths, not credentials."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/cli/telemetry/__init__.py",
+      "sha256": "4eab7bbf76cf968e8fdea9016ad14656e24a99c25a56c599a03222c0fa0dfa10",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEFAULT_INSTRUMENTATION_KEY is the official Azure CLI public telemetry resource identifier, exactly equal to upstream. Microsoft explicitly states instrumentation identifiers are not security tokens or security keys. It can identify the telemetry ingestion destination; this is not evidence of confidential authentication material."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/common/__pycache__/client_factory.cpython-314.opt-1.pyc",
+      "sha256": "70c9804ad6933d92636ef24d2995f090922a3d3626cfb41c8e2e68ec691c8880",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "Bytecode contains the clientSecret JSON documentation example from client_factory.py lines 163 and 266. Both LF-delimited match lines contain the complete matching source example line."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/common/client_factory.py",
+      "sha256": "e93ae515a32745b58bfff957e7391cfd17ab8131f8069c0025d305fd9cfbde07",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "clientSecret literals occur only in docstrings for get_client_from_json_dict and get_client_from_auth_file, not executable credential assignments. Exact lines match official azure-common 1.1.28 release examples. Current main has since replaced those examples with masked values; no claim that this history proves a formerly live secret."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/keyvault/certificates/_models.py",
+      "sha256": "eb6b5e39f1a1760cfea1fc02ea2c536b929bf002463aa5f6fa3a73b9de7bb17f",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "CertificatePolicy._from_certificate_policy_bundle passes enhanced_key_usage from x509_certificate_properties.ekus conditionally, otherwise None. Runtime attribute lookup of certificate usage metadata, not a literal key."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/apimanagement/models/_models_py3.py",
+      "sha256": "86f4c5cf59663bc68985066a81f70148c6d27e0fc09246a520a057232661a55c",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "SDK _attribute_map entries for tls10_enabled and tls11_enabled map to JSON property names and bool schema types. Serialization metadata, not API key values."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/containerservice/models/_models_py3.py",
+      "sha256": "5ee6527b9f9644cda9d11bd611b7240fb59805755053cc0d3578411448ce1ae9",
+      "rule": "generic-api-key",
+      "count": 7,
+      "reason": "SDK _attribute_map entries map TCP timeout, keepalive, TIME_WAIT, and netfilter conntrack settings to JSON property names and int/bool schema types. Serialization metadata, not credentials."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/iothub/models/_models_py3.py",
+      "sha256": "7bee0d6b1e1a5bed8b0cd47e9f66cc3641ec6b12546df7b634b6d6741c0712b2",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "SDK _attribute_map default_ttl_as_iso8601 and enable_root_certificate_v2 entries map to JSON fields with duration and bool types. Names and types, not secrets."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/servicefabricmanagedclusters/models/_models_py3.py",
+      "sha256": "c817a9ef6762d1f4699d4735e4f1ed2e44215985a6b7d0a1275139a4bafd7107",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "SDK _attribute_map enable_ipv6 entry maps to the JSON properties.enableIpv6 name with bool type. Schema metadata."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/servicelinker/models/__pycache__/_models_py3.cpython-314.opt-1.pyc",
+      "sha256": "3220e515a271aff49f87352af5e38e9c5a485a1dd3ec2febfa20bc599b54d353",
+      "rule": "confluent-access-token",
+      "count": 6,
+      "reason": "Six bytecode docstrings contain the complete same source line naming Confluent service target enum values. Source counterpart is _models_py3.py lines 230, 265, 645, 677, 1558, 2278; Confluent-prefixed service type names are not access tokens."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/servicelinker/models/_models_py3.py",
+      "sha256": "df3b16209e3d04e7c270c8339bf7b8309c0b43d472218975753773304db67f3d",
+      "rule": "confluent-access-token",
+      "count": 6,
+      "reason": "Six SDK docstrings enumerate target service types including Confluent bootstrap server and schema registry. Enum/service names, not a Confluent access token."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/sql/models/_models_py3.py",
+      "sha256": "ed43ce5391ac8a233b2c087e93d9dbfabb1f1ea158c5a90394d3bfb2cbb23248",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "Two SDK _attribute_map is_i_pv6_enabled entries map to the properties.isIPv6Enabled JSON field and str schema type. Schema metadata."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/mgmt/storage/models/_models_py3.py",
+      "sha256": "2e3d5fe2f1043b56a70b8c5089434012987d321cad00c923b3ec98581eebe33b",
+      "rule": "generic-api-key",
+      "count": 7,
+      "reason": "SDK _attribute_map entries describe NFSv3 root/all squash and enablement fields, all bool schema types. Repeated model definitions, not credentials."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/monitor/query/_metrics_query_client.py",
+      "sha256": "342d0f8fa1cdff60f05d4f625d692866ed23899196586a33efcdc5a85021896c",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "ImportFrom statement imports get_authentication_policy and construct_iso8601 from _helpers. Function names, no credential assignment or literal."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/storage/blob/_shared/parser.py",
+      "sha256": "a35844792bd22e4d86576c7fa7f494b096dcfe9496049ac96914f142af8f8b54",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEVSTORE_ACCOUNT_KEY is the documented public Azurite development account constant paired with devstoreaccount1. Exact value equals official Azure SDK parser and Azurite default account documentation. It authenticates to the emulator by design, not a confidential production credential."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/storage/common/_constants.py",
+      "sha256": "1b16b39c26c5fdaf8c1bd9641b26a23b5768c1b422c728617e949e092ff2aba3",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEV_ACCOUNT_KEY is the same public Azurite development account constant paired with DEV_ACCOUNT_NAME. Exact literal equals official Azurite default account documentation."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/storage/filedatalake/_shared/parser.py",
+      "sha256": "a35844792bd22e4d86576c7fa7f494b096dcfe9496049ac96914f142af8f8b54",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEVSTORE_ACCOUNT_KEY is the same public Azurite development account constant in the Data Lake shared parser. Exact literal equals official Azurite default account documentation."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/storage/fileshare/_shared/parser.py",
+      "sha256": "a35844792bd22e4d86576c7fa7f494b096dcfe9496049ac96914f142af8f8b54",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEVSTORE_ACCOUNT_KEY is the same public Azurite development account constant in the File Share shared parser. Exact literal equals official Azurite default account documentation."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/storage/queue/_shared/parser.py",
+      "sha256": "a35844792bd22e4d86576c7fa7f494b096dcfe9496049ac96914f142af8f8b54",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "DEVSTORE_ACCOUNT_KEY is the same public Azurite development account constant in the Queue shared parser. Exact literal equals official Azurite default account documentation."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/jwt/algorithms.py",
+      "sha256": "70aafe5c48a87b4981b6a24c09a1c4b30a95380d59f0fbabb7949bdc18bee411",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "sign method parameter key has an Ed25519PrivateKey or Ed448PrivateKey type annotation. Type references, not private key bytes."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/oauthlib/oauth1/rfc5849/__pycache__/parameters.cpython-314.opt-1.pyc",
+      "sha256": "3b3e769e2e04467ef9a6c4716fca0552736c616c74fd140b7c671bd96f4f76b2",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "Bytecode documentation counterparts of OAuth1 prepare_headers examples. LF match lines embed complete source lines 30 and 33 respectively."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/oauthlib/oauth1/rfc5849/parameters.py",
+      "sha256": "01b9f1a62c7f632ecfdc0def6e4ad5d9b905c6d9d1e534534ca74ebbd30ac9da",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "OAuth1 prepare_headers docstring has an example Authorization header with consumer key, token, and signature fields. Both detected lines exactly match official OAuthlib source; they are non-executable examples."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/oauthlib/oauth2/rfc6749/__pycache__/parameters.cpython-314.opt-1.pyc",
+      "sha256": "c174cbed3e4c2030ddd272baa47387fc03920e44ac5a7901cb9e2ae0b550bb78",
+      "rule": "generic-api-key",
+      "count": 3,
+      "reason": "Bytecode documentation counterparts of OAuth2 response examples; LF lines 226, 286, 289 embed source lines 330, 408, 411 respectively."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/oauthlib/oauth2/rfc6749/parameters.py",
+      "sha256": "82d64e886e9f4f62b70a8cbc4479dcbbd2b8d5aa3a01dc00863bc378b037ac1c",
+      "rule": "generic-api-key",
+      "count": 3,
+      "reason": "OAuth2 parse_implicit_response and parse_token_response docstrings show example.com redirect and JSON example access/refresh tokens. Exact lines match official OAuthlib and token literals are the RFC6749 worked examples."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/pyjwt-2.10.1.dist-info/METADATA",
+      "sha256": "234d888ca9a62b8755cbdb35eb6b6eae18e84bb0007cdaff5359a82951545e13",
+      "rule": "jwt",
+      "count": 1,
+      "reason": "PyJWT package METADATA reproduces the README HS256 worked example. Exact displayed JWT equals official tagged 2.10.1 README. Decoded payload has only the example some field, and HMAC verification succeeds with the signing input explicitly shown by the example. No issuer, audience, subject, or expiry claims. No live authentication attempted."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/requests_oauthlib/__pycache__/oauth1_session.cpython-314.opt-1.pyc",
+      "sha256": "49abee44fdd1b652d58cb93e0653e22139993718ee60a57260d6cb3a430d31b3",
+      "rule": "generic-api-key",
+      "count": 9,
+      "reason": "Nine bytecode documentation matches embed oauth_token_secret examples from OAuth1Session and its methods. Exact embedded source lines are recorded per finding; source examples match official Requests OAuthlib."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/requests_oauthlib/oauth1_session.py",
+      "sha256": "03a8fb0a043c9f622be009fef14d09f65c9435e63c1f959f7f92393d61f39477",
+      "rule": "generic-api-key",
+      "count": 9,
+      "reason": "Nine oauth_token_secret lines are inside OAuth1Session or method docstrings, confirmed through Python AST spans. They are repeated worked examples, exactly present in official Requests OAuthlib source."
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/websocket/tests/test_websocket.py",
+      "sha256": "1795ed3b06bfbf6247504fb13a90967615205187cd6c7184ac724a4346c4b132",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "test_ws_utils and test_manual_headers use fixed WebSocket handshake nonce/header constants. AST confirms test methods; both constants exactly match official websocket-client tests. Sec-WebSocket-Key is handshake challenge material, not an account credential."
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/cryptography/hazmat/bindings/_rust/openssl/hpke.pyi",
+      "sha256": "a7f8462e7e981fe11aac91755796d4b14b638a9be2100a5c4793b4b141c92ed7",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "HPKE .pyi method/function private_key parameters are union type annotations containing x25519.X25519PrivateKey and other private-key classes. Type names, not key material."
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/nacl/bindings/crypto_sign.py",
+      "sha256": "3f948b91f440ab9963e452db03506e06b283c305b45e30caff1a67f091386aa2",
+      "rule": "generic-api-key",
+      "count": 1,
+      "reason": "crypto_sign_ed25519_sk_to_curve25519 assigns curve_secret_key_len from crypto_sign_curve25519_BYTES before buffer allocation. A size constant expression, not secret bytes."
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/nacl/pwhash/__init__.py",
+      "sha256": "5d20d777bc101cd2c41e5d269077d56f994542ca7aca01e485e9fbd7c8740523",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "PASSWD_MIN and PASSWD_MAX alias argon2id module password length bound constants. Numeric configuration constants, not passwords."
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/nacl/pwhash/argon2i.py",
+      "sha256": "208bc8b8ef6c88a52ee7e5a9cf44868a5b4b42fec3bbf9a2f41504f083512bfe",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "PASSWD_MIN and PASSWD_MAX alias _argon2 password length bound constants. Numeric configuration constants, not passwords."
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/nacl/pwhash/argon2id.py",
+      "sha256": "7994c345cccdd479049f07281df8120bd979d2758b574a206be06c04e59c06f0",
+      "rule": "generic-api-key",
+      "count": 2,
+      "reason": "PASSWD_MIN and PASSWD_MAX alias _argon2 password length bound constants. Numeric configuration constants, not passwords."
+    }
+  ],
+  "layers": [
+    {
+      "path": "usr/bin/gh",
+      "sha256": "16fdbf30d6f97bc5b0fb94745e00fa06ae68beb6c6653d7f584b32602800397d",
+      "rule": "github-token",
+      "count": 1,
+      "reason": "Approved token-prefix/Go string-pool boundary match; exact installed-build provenance remains limited.",
+      "classification": "approved-provisional-benign"
+    },
+    {
+      "path": "usr/bin/ssh",
+      "sha256": "ae339eda0cbac945d383cd6519de3e2e53d18acfb6cc634a5276a93f9839b2aa",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/bin/ssh-add",
+      "sha256": "71ca9eefd2586d2f47a483a9c086f33b0224eea9feca99ae510f30e3a0bc8884",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/bin/ssh-keygen",
+      "sha256": "bb13e6ff90ade685d2154772b6a25729e5a5a98193fdb7d6ceba53cad315a109",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/node_modules_24/npm/node_modules/@npmcli/config/lib/definitions/definitions.js",
+      "sha256": "9c7b6567bc25c4dfba128a214231dceab6d854c59d8655aabd050077271c943c",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/cli/command_modules/role/custom.py",
+      "sha256": "f58439f80780bf639adda1452b785b3205fe818c50a6a97eb8ea73960eba1a74",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/cli/command_modules/vm/_vm_utils.py",
+      "sha256": "a5f24fd1d6670cd8f8d7d9296a691ecb8015fc83548b69316ca2f47162923a88",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/cli/core/auth/identity.py",
+      "sha256": "2ca2951f9db5b8b0118609e46c0d0077d27748cbed14f35581d320f721b2bc0b",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/azure/cli/core/keys.py",
+      "sha256": "6b818e14efb05e44ae67ee3c85edfb2426581da0ca9fcb3b0f799770d6f5f4c6",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/msal/__pycache__/application.cpython-314.opt-1.pyc",
+      "sha256": "da9c84f4c795408be9b28354a74568e5fb138cf53efa56a3bad1bd0299bf3c5e",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/msal/__pycache__/application.cpython-314.pyc",
+      "sha256": "32c3498b063cc40dd2ac02557a2596f044b459201c37b0a98f6072f54b8f55ec",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib/python3.14/site-packages/msal/application.py",
+      "sha256": "7da13ba28a757808fbe35bd4eec608687fc5e829adaf3a329a6d4ad8b78a512f",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libgio-2.0.so.0.8800.3",
+      "sha256": "690b46b90b9a1f61f08c8a8eea893e349fb2b68ff7618b9aba573ee9508b0fcb",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libgio-2.0.so.0.8800.4",
+      "sha256": "bca91d16d1ed9ee423d99284ab8bd749348fff7e75dda3bffe9b4f9f3e4907a0",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libgnutls.so.30.42.0",
+      "sha256": "c401fdf47f90dac4efa3893135e19ca1a9275696ff4a4a292fa183539f8d374d",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Ten complete PEM blocks exactly match public GnuTLS 3.8.13 cryptographic self-test fixtures.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libnode.so.137",
+      "sha256": "2aaaf2a556faedd32951bda60f8e22476935825a7a4eb21c2569cfcddab10380",
+      "rule": "aws-access-key",
+      "count": 1,
+      "reason": "Pattern lies in base64 WebAssembly code in exactly matched Node 24.18.0 deps/amaro/dist/index.js.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libssh.so.4.12.0",
+      "sha256": "a03dafdd2d7ac474c3451644eac5426161b6fc363e583de67c0ac436af0a6341",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/libunistring.so.5.0.0",
+      "sha256": "5de0c08a98e1bffa31f9e4dc22870a20f903248078602a194398cd7206e2d831",
+      "rule": "aws-access-key",
+      "count": 1,
+      "reason": "Approved Unicode word-table match with exact 374-byte upstream region; full-table/version provenance remains limited.",
+      "classification": "approved-provisional-benign"
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/cryptography/hazmat/primitives/serialization/__pycache__/ssh.cpython-314.opt-1.pyc",
+      "sha256": "ca8bce7a9c06e85a2024b8643b29728fd4ec8b6ca38058a5d7a8430dc55619b8",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/cryptography/hazmat/primitives/serialization/__pycache__/ssh.cpython-314.pyc",
+      "sha256": "3073d24183d53c0431823995459ae1c32dbf32d3e2c34c6b1a20dd3c0bc6ce89",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    },
+    {
+      "path": "usr/lib64/python3.14/site-packages/cryptography/hazmat/primitives/serialization/ssh.py",
+      "sha256": "162b177bf9d429d3c67ea10d5612a99a86b399a23ca87f067be5466dcd1dca4c",
+      "rule": "private-key",
+      "count": 1,
+      "reason": "Reviewed parser boundary, documentation placeholder, or compiled counterpart; no complete operational key.",
+      "classification": "confirmed-benign"
+    }
+  ]
+}

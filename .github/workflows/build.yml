@@ -1,0 +1,54 @@
+name: Manual Fedora image verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up scanner Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.14'
+      - name: Initialize ownership ledger
+        run: |
+          set -eu
+          echo "OWNERSHIP_LEDGER=$RUNNER_TEMP/fedora44-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.json" >> "$GITHUB_ENV"
+      - name: Source tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/policy-venv"
+          "$RUNNER_TEMP/policy-venv/bin/python" -m pip install -r tests/requirements.txt
+          export PATH="$RUNNER_TEMP/policy-venv/bin:$PATH"
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+      - name: Build and smoke test
+        run: |
+          podman --version
+          base=$(python3 -c 'import json; x=json.load(open("fedora44-dotnet10/versions.json")); print(x["base"]["reference"] + "@" + x["base"]["index_digest"])')
+          podman pull "$base"
+          bash tests/build.sh
+          bash tests/run-smoke.sh
+      - name: All-layer scan
+        run: |
+          mkdir -p "$RUNNER_TEMP/review"
+          image=$(python3 tests/owned_run.py image "$OWNERSHIP_LEDGER")
+          podman save --format docker-archive -o "$RUNNER_TEMP/review/candidate.tar" "$image"
+          bash tests/scan.sh "$RUNNER_TEMP/review/candidate.tar" "$RUNNER_TEMP/review/evidence"
+      - name: Prepare public scan reports
+        if: always()
+        run: python3 tests/public_reports.py "$RUNNER_TEMP/review/evidence" "$RUNNER_TEMP/review/public-reports"
+      - name: Retain scan reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scan-reports-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/review/public-reports/*.json
+      - name: Scoped cleanup
+        if: always()
+        run: bash tests/cleanup.sh

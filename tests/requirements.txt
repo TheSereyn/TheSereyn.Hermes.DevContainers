@@ -1,0 +1,2 @@
+# Source-policy YAML parser. Install in a disposable virtual environment.
+PyYAML==6.0.3

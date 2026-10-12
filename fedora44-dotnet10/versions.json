@@ -1,0 +1,27 @@
+{
+  "distribution": "Fedora 44",
+  "platform": "linux/amd64",
+  "base": {
+    "reference": "quay.io/fedora/fedora-minimal",
+    "index_digest": "sha256:94938a50b2d2ca73dbaa2529e4f4697e3f734276139ebb5767866b064746532d",
+    "architecture": "amd64"
+  },
+  "repositories": {
+    "enabled": ["fedora", "updates"],
+    "excluded": ["fedora-cisco-openh264"],
+    "vendor_repositories": []
+  },
+  "tools": {
+    "dotnet_sdk": "10.0.112",
+    "node": "24.18.0",
+    "npm": "11.16.0",
+    "python": "3.14.8",
+    "uv": "0.12.19",
+    "git": "2.56.0",
+    "github_cli": "2.97.0",
+    "azure_cli": "2.83.0",
+    "ripgrep": "15.2.0"
+  },
+  "package_lock": "rpm-packages.lock",
+  "browser_runtime": false
+}
