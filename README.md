@@ -41,7 +41,21 @@ See [build and test](docs/build-and-test.md) for source tests, smoke tests, and 
 
 ## Use with Hermes Agent
 
-Build the image on the machine running the Hermes terminal backend. To use the locally built Podman image, select Podman and set the image tag in Hermes:
+Hermes supports Docker Engine, Docker Desktop, and Podman through its `docker` terminal backend. Build or load the image into the selected runtime on the machine running Hermes. The examples below use the tag `localhost/hermes-dev-dotnet:10.0`.
+
+### Docker
+
+With Docker Engine or Docker Desktop running, select Docker and set the image tag:
+
+```sh
+hermes config set HERMES_DOCKER_BINARY docker
+hermes config set terminal.backend docker
+hermes config set terminal.docker_image localhost/hermes-dev-dotnet:10.0
+```
+
+### Podman
+
+Build the image with the local build script, then select Podman and set the image tag:
 
 ```sh
 hermes config set HERMES_DOCKER_BINARY podman
@@ -49,7 +63,7 @@ hermes config set terminal.backend docker
 hermes config set terminal.docker_image localhost/hermes-dev-dotnet:10.0
 ```
 
-Hermes uses the `docker` backend for both Docker and Podman. The selected runtime must have access to the image. For Docker Engine or Docker Desktop, load or build the image in Docker and use that image's tag for `terminal.docker_image`.
+Docker and Podman use separate local image stores. The image must be available in the runtime selected by `HERMES_DOCKER_BINARY`. Set `terminal.docker_image` to the tag used by that runtime.
 
 Start a new Hermes process after changing the settings. See the [Hermes terminal configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration#terminal) for backend options.
 
