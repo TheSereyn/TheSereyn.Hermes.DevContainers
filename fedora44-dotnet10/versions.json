@@ -3,12 +3,17 @@
   "platform": "linux/amd64",
   "base": {
     "reference": "quay.io/fedora/fedora-minimal",
-    "index_digest": "sha256:94938a50b2d2ca73dbaa2529e4f4697e3f734276139ebb5767866b064746532d",
+    "index_digest": "sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475",
     "architecture": "amd64"
   },
   "repositories": {
-    "enabled": ["fedora", "updates"],
-    "excluded": ["fedora-cisco-openh264"],
+    "enabled": [
+      "fedora",
+      "updates"
+    ],
+    "excluded": [
+      "fedora-cisco-openh264"
+    ],
     "vendor_repositories": []
   },
   "tools": {
