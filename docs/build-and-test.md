@@ -7,7 +7,7 @@ Run commands from the repository root on Linux/AMD64. Building requires Podman, 
 Pull the base image and build the current SDK line:
 
 ```sh
-podman pull quay.io/fedora/fedora-minimal@sha256:94938a50b2d2ca73dbaa2529e4f4697e3f734276139ebb5767866b064746532d
+podman pull quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475
 bash fedora44-dotnet10/build-local.sh
 ```
 
@@ -74,4 +74,4 @@ The workflow fails if it detects any of the following:
 - Incomplete nested-archive coverage
 - Failed scan stages
 
-See the [vulnerability register](vulnerabilities.md) for the findings from the 2026-10-12 scan.
+See the [vulnerability register](vulnerabilities.md) for the findings from the 2026-10-13 scan.

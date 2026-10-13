@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-minimal@sha256:f362951032563f154aa976533e3a77c0a51314777de34971f41d99e6956bbc85 AS refreshed
+FROM quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475 AS refreshed
 
 # Exclude the optional OpenH264 repository from this image.
 RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo \
@@ -55,7 +55,7 @@ RUN test "$(sha256sum /usr/share/hermes-dev/rpm-packages.lock | cut -d' ' -f1)" 
  && python3 -c 'import pathlib,sys; expected=pathlib.Path("/usr/share/hermes-dev/rpm-packages.lock").read_text(); actual=pathlib.Path("/tmp/installed-rpms").read_text(); sys.exit(expected != actual)' \
  && rm -f /tmp/installed-rpms
 LABEL org.opencontainers.image.base.name="quay.io/fedora/fedora-minimal" \
-      org.opencontainers.image.base.digest="sha256:94938a50b2d2ca73dbaa2529e4f4697e3f734276139ebb5767866b064746532d" \
+      org.opencontainers.image.base.digest="sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475" \
       org.thesereyn.package-lock.sha256="${PACKAGE_LOCK_SHA256}" \
       org.thesereyn.recipe.sha256="${RECIPE_SHA256}"
 CMD ["bash"]

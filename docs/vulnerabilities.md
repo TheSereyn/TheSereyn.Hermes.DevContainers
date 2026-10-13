@@ -1,28 +1,28 @@
 # Image vulnerability register
 
-This register lists vulnerability findings from the image scan dated 2026-10-12. Findings are grouped by the tool that introduced the affected component, including its dependencies.
+This register lists vulnerability findings from the image scan dated 2026-10-13. Findings are grouped by the tool that introduced the affected component, including its dependencies.
 
 ## Snapshot and scope
 
 - Image: Fedora 44, Linux/AMD64, .NET 10 development image.
-- Image config ID: `sha256:0dff96899a4526c3054020e9b5e9e49652c325afdc7ec8766468d91c3235cf9c`.
-- Scan date: 2026-10-12; scanner: Grype 0.120.1.
-- Database build: 2026-10-12T06:45:22Z.
-- Image archive SHA-256: `b49def75212ae006e34ad7979082e728f66b839d18892f35d0f9c0eddf977f4d`.
+- Image config ID: `sha256:659a29220dd17b5341893af0a3016739e640caa44d90d950ccd8b4a9f7cdf176`.
+- Scan date: 2026-10-13; scanner: Grype 0.120.1.
+- Database build: 2026-10-13T06:35:20Z.
+- Image archive SHA-256: `bf896026fa300c3228fe30fb350eb5c8a615ce097df3684971506911532e10b3`.
 - Findings: 64 advisory matches, including 3 Critical, 26 High, 28 Medium, 5 Low, and 2 Unknown.
 - The matches came from layers adding Node.js/npm and later command-line tools: 29 npm components, 15 Go modules bundled in GitHub CLI, and 20 Python components installed with Azure CLI. This scan found no matches in the Fedora base-image layers or the .NET SDK installation layer.
 
 ## Verification results
 
-The fresh build and root/nonroot smoke tests passed. A fresh scan of the exact tested image passed verification after applying the known-benign registry. The reports retain 93 corpus matches and 21 layer-pattern matches, all classified as known benign, with no unreviewed findings or nested-archive coverage gaps. The earlier failed scan remains preserved separately.
+The fresh build and root/nonroot smoke tests passed. A fresh scan of the exact tested image passed verification after applying the known-benign registry. The reports retain 93 corpus matches and 20 layer-pattern matches, all classified as known benign, with no unreviewed findings or nested-archive coverage gaps. The earlier failed scan remains preserved separately.
 
-The corpus secret scan reported 93 matches. The layer audit reported 21 pattern matches, including 18 private-key markers, 2 AWS access-key patterns, and 1 GitHub-token pattern. These findings are recorded in `tests/known-benign.json` with exact file hashes and rule-specific count limits. The five parseable GnuTLS keys match public cryptographic self-test fixtures. Other matches are documentation examples, parser markers, encoded program content, or approved binary string-table patterns. Known-benign findings remain visible in raw reports. Changed or additional matches require review.
+The corpus secret scan reported 93 matches. The layer audit reported 20 pattern matches, including 17 private-key markers, 2 AWS access-key patterns, and 1 GitHub-token pattern. These findings are recorded in `tests/known-benign.json` with exact file hashes and rule-specific count limits. The five parseable GnuTLS keys match public cryptographic self-test fixtures. Other matches are documentation examples, parser markers, encoded program content, or approved binary string-table patterns. Known-benign findings remain visible in raw reports. Changed or additional matches require review.
 
 ## Changes from the previous scan
 
-The previous image, `sha256:44a40a5b1e5dc8564e3807b5057c6d59ce36a4c4e45c3bb201177139dcd51a1d`, was scanned on 2026-10-11. The new image includes glib2 2.88.4 in place of 2.88.3 and was scanned with a newer vulnerability database.
+The previous image, `sha256:0dff96899a4526c3054020e9b5e9e49652c325afdc7ec8766468d91c3235cf9c`, was scanned on 2026-10-12. The new image uses an updated Fedora 44 base and includes updates to curl, libcurl, and openldap. It was scanned with a newer vulnerability database.
 
-All 64 advisory/package matches persist. No advisory/package matches were added or resolved. The 93 corpus secret matches have the same rules, source locations, and line ranges. The all-layer audit has one additional private-key marker in the updated glib2 library. This marker has no complete PEM key block.
+All 64 advisory/package matches persist. No advisory/package matches were added or resolved. The 93 corpus secret matches have the same rules, source locations, and line ranges. The all-layer audit has one fewer private-key marker because the updated base no longer includes the older libgio library layer.
 
 The scan reports advisory matches. Exploitability and update availability have not been verified.
 

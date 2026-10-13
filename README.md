@@ -27,7 +27,7 @@ The image provides `python3`, not a `python` alias. System pip is not installed.
 The build script creates a local Podman image tagged `localhost/hermes-dev-dotnet:10.0` and updates `localhost/hermes-dev-dotnet:latest` by default. It does not publish an image to a registry.
 
 ```sh
-podman pull quay.io/fedora/fedora-minimal@sha256:94938a50b2d2ca73dbaa2529e4f4697e3f734276139ebb5767866b064746532d
+podman pull quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475
 bash fedora44-dotnet10/build-local.sh
 ```
 
@@ -80,4 +80,4 @@ podman run --rm -it \
 
 On SELinux systems, add `:Z` to the volume option if the container cannot access the mounted project directory.
 
-The image scan dated 2026-10-12 found vulnerability matches. See the [vulnerability register](docs/vulnerabilities.md) for findings and update statuses, and [third-party notices](docs/third-party-notices.md) for supplier information.
+The image scan dated 2026-10-13 found vulnerability matches. See the [vulnerability register](docs/vulnerabilities.md) for findings and update statuses, and [third-party notices](docs/third-party-notices.md) for supplier information.
