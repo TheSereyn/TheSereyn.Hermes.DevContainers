@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475 AS refreshed
+FROM quay.io/fedora/fedora-minimal@sha256:1dc6bd367b14f10b205a0b49afcef8e295952a4187190f1672c3074f8117b74d AS refreshed
 
 # Exclude the optional OpenH264 repository from this image.
 RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo \
