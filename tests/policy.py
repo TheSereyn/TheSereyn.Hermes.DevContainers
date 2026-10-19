@@ -33,7 +33,148 @@ WorkflowLoader.add_implicit_resolver(
     'tag:yaml.org,2002:bool', re.compile(r'^(?:true|false)$'), list('tf'))
 
 
-def check_workflow(text):
+def _contains_token_exposure(value):
+    if isinstance(value, dict):
+        return any(
+            (isinstance(key, str) and re.search(
+                r'(?:^|_)(?:[A-Z0-9]+_)*(?:TOKEN|SECRET|PASSWORD|CREDENTIALS?)$',
+                key, re.IGNORECASE))
+            or _contains_token_exposure(item)
+            for key, item in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_token_exposure(item) for item in value)
+    if isinstance(value, str):
+        return bool(re.search(
+            r'\$\{\{\s*(?:github\.token|secrets\.[^}]+)\s*\}\}',
+            value, re.IGNORECASE))
+    return False
+
+
+def _check_manual_publication(workflow):
+    errors = []
+    if workflow.get('on') != {'workflow_dispatch': None}:
+        errors.append('publication workflow must be manual-only')
+    if workflow.get('permissions') != {'contents': 'read'}:
+        errors.append('publication workflow must have read-only global permissions')
+
+    jobs = workflow.get('jobs')
+    if not isinstance(jobs, dict) or set(jobs) != {'build'}:
+        errors.append('publication workflow must have one build job')
+        return errors
+    job = jobs['build']
+    if not isinstance(job, dict):
+        errors.append('publication job must be a mapping')
+        return errors
+    if job.get('if') != "github.ref == 'refs/heads/main'":
+        errors.append('publication job must be restricted to main')
+    if job.get('permissions') != {'contents': 'read', 'packages': 'write'}:
+        errors.append('publication job permissions must be contents read and packages write')
+    if job.get('continue-on-error') not in (None, False):
+        errors.append('publication job must not continue after failure')
+    for scope, value in (('workflow', workflow.get('env')), ('job', job.get('env'))):
+        if _contains_token_exposure(value):
+            errors.append('GitHub package token must not be exposed through ' + scope + ' environment')
+
+    steps = job.get('steps')
+    if not isinstance(steps, list):
+        errors.append('publication job must declare steps')
+        return errors
+    names = [step.get('name') if isinstance(step, dict) else None for step in steps]
+    required_steps = ('Build and smoke test', 'All-layer scan', 'Retain scan reports',
+                      'Publish exact candidate to GHCR', 'Scoped cleanup')
+    positions = {}
+    for name in required_steps:
+        found = [index for index, value in enumerate(names) if value == name]
+        if len(found) != 1:
+            errors.append('publication workflow requires one ' + name + ' step')
+        else:
+            positions[name] = found[0]
+    if len(positions) == len(required_steps):
+        if not (positions['Build and smoke test'] < positions['All-layer scan']
+                < positions['Retain scan reports']
+                < positions['Publish exact candidate to GHCR'] < positions['Scoped cleanup']):
+            errors.append('publication must follow build, smoke test, scan and reports, before cleanup')
+        build = steps[positions['Build and smoke test']]
+        scan = steps[positions['All-layer scan']]
+        build_run = build.get('run')
+        if (not isinstance(build_run, str) or 'tests/build.sh' not in build_run
+                or 'tests/run-smoke.sh' not in build_run):
+            errors.append('publication requires the repository build and smoke tests before scanning')
+        cleanup = steps[positions['Scoped cleanup']]
+        scan_run = scan.get('run')
+        if not isinstance(scan_run, str) or 'tests/scan.sh' not in scan_run:
+            errors.append('publication requires the repository all-layer scan')
+        cleanup_run = cleanup.get('run')
+        if (cleanup.get('if') != 'always()' or not isinstance(cleanup_run, str)
+                or 'tests/cleanup.sh' not in cleanup_run):
+            errors.append('publication workflow must always run scoped cleanup')
+
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get('continue-on-error') not in (None, False):
+            errors.append('publication workflow steps must not continue after failure')
+        if (step.get('name') != 'Publish exact candidate to GHCR'
+                and _contains_token_exposure(step)):
+            errors.append('GitHub package token must be exposed only to the publication step')
+
+    publish_steps = [step for step in steps if isinstance(step, dict)
+                     and step.get('name') == 'Publish exact candidate to GHCR']
+    if len(publish_steps) != 1:
+        return errors
+    publish = publish_steps[0]
+    if publish.get('if') != "success() && github.ref == 'refs/heads/main'":
+        errors.append('publication step must require prior success on main')
+    if publish.get('env') != {
+            'GHCR_USER': '${{ github.actor }}',
+            'GHCR_TOKEN': '${{ github.token }}'}:
+        errors.append('publication must use only the scoped GitHub actor and token')
+    if set(publish) != {'name', 'if', 'env', 'run'}:
+        errors.append('publication step must not add actions or extra execution settings')
+    script = publish.get('run')
+    if not isinstance(script, str):
+        errors.append('publication script must be a string')
+        return errors
+    required = (
+        'tests/owned_run.py image "$OWNERSHIP_LEDGER"',
+        'podman image inspect --format',
+        'fedora44-dotnet10/versions.json',
+        'ghcr.io/thesereyn/hermes-dev-dotnet',
+        "printf '%s' \"$GHCR_TOKEN\" | podman login",
+        '--password-stdin', '--authfile "$authfile"',
+        'podman tag "$image" "$version_ref"',
+        'podman tag "$image" "$latest_ref"',
+        'podman push --authfile "$authfile" --format oci --digestfile "$version_digest" "$version_ref"',
+        'podman push --authfile "$authfile" --format oci --digestfile "$latest_digest" "$latest_ref"',
+        'cmp "$version_digest" "$latest_digest"',
+        'podman pull --authfile "$authfile" "$version_ref"',
+        'podman pull --authfile "$authfile" "$latest_ref"',
+        'test "$version_id" = "$candidate_id"',
+        'test "$latest_id" = "$candidate_id"',
+        'podman logout --authfile "$authfile" ghcr.io',
+        'rm -f "$authfile"',
+    )
+    for item in required:
+        if item not in script:
+            errors.append('publication script missing required check: ' + item)
+    if re.search(r'--password(?:=|\s)', script):
+        errors.append('registry token must use password-stdin')
+    if re.search(r'(?m)^\s*set\s+-[^\n]*x|\bset\s+-o\s+xtrace\b', script):
+        errors.append('publication script must not enable shell tracing')
+    if re.search(r'\bsecrets\.', script):
+        errors.append('publication script must not reference repository secrets')
+    if len(re.findall(r'(?m)^\s*podman\s+push\b', script)) != 2:
+        errors.append('publication script must push exactly two tags')
+    if len(re.findall(r'(?m)^\s*podman\s+pull\b', script)) != 2:
+        errors.append('publication script must read back both tags')
+    if len(re.findall(r'\bpodman\s+login\b', script)) != 1:
+        errors.append('publication script must log in once')
+    if re.search(r'(?m)^\s*podman\s+(?:build|load|import)\b', script):
+        errors.append('publication must use the already-tested candidate')
+    return errors
+
+
+def check_workflow(text, *, allow_image_publication=False):
     try:
         workflow = yaml.load(text, Loader=WorkflowLoader)
     except (yaml.YAMLError, ValueError, TypeError, RecursionError) as error:
@@ -47,13 +188,32 @@ def check_workflow(text):
                 or any(level not in ('read', 'none') for level in value.values())):
             errors.append('permissions must explicitly grant contents read and no writes')
 
-    permissions(workflow.get('permissions'))
+    if not allow_image_publication:
+        permissions(workflow.get('permissions'))
 
-    def visit(value):
+    publication_step = None
+    if allow_image_publication:
+        jobs = workflow.get('jobs')
+        build = jobs.get('build') if isinstance(jobs, dict) else None
+        steps = build.get('steps') if isinstance(build, dict) else None
+        if isinstance(steps, list):
+            matches = [step for step in steps if isinstance(step, dict)
+                       and step.get('name') == 'Publish exact candidate to GHCR']
+            if len(matches) == 1:
+                publication_step = matches[0]
+
+    def visit(value, path=()):
+        if allow_image_publication and value is publication_step:
+            return
         if isinstance(value, dict):
             for key, item in value.items():
+                child_path = path + (key,)
                 if key == 'permissions':
-                    permissions(item)
+                    if not allow_image_publication:
+                        permissions(item)
+                    elif child_path not in {
+                            ('permissions',), ('jobs', 'build', 'permissions')}:
+                        errors.append('unexpected permission scope in publication workflow')
                 if key == 'uses':
                     if not isinstance(item, str) or not re.fullmatch(r'[\w./-]+@[a-f0-9]{40}', item):
                         errors.append('unpinned action: ' + str(item))
@@ -99,10 +259,10 @@ def check_workflow(text):
                                 errors.append('registry login or push command')
                         except ValueError:
                             errors.append('invalid shell quoting in run')
-                visit(item)
+                visit(item, child_path)
         elif isinstance(value, list):
             for item in value:
-                visit(item)
+                visit(item, path)
 
     visit(workflow)
     events = workflow.get('on', {})
@@ -119,6 +279,8 @@ def check_workflow(text):
             timeout = job.get('timeout-minutes')
             if type(timeout) is not int or not 0 < timeout <= 60:
                 errors.append('job must have a bounded timeout')
+    if allow_image_publication:
+        errors.extend(_check_manual_publication(workflow))
     return errors
 
 
@@ -191,5 +353,6 @@ def check_repository(root):
             errors.append('context is not allowlisted: ' + str(path.parent))
     for path in sorted(set((root / '.github/workflows').glob('*.yml'))
                        | set((root / '.github/workflows').glob('*.yaml'))):
-        errors.extend(path.name + ': ' + e for e in check_workflow(path.read_text()))
+        errors.extend(path.name + ': ' + e for e in check_workflow(
+            path.read_text(), allow_image_publication=path.name == 'build.yml'))
     return errors

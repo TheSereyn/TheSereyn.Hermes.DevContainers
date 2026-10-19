@@ -5,8 +5,12 @@ permissions:
   contents: read
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -49,6 +53,63 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           path: ${{ runner.temp }}/review/public-reports/*.json
+      - name: Publish exact candidate to GHCR
+        if: success() && github.ref == 'refs/heads/main'
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          image=$(python3 tests/owned_run.py image "$OWNERSHIP_LEDGER")
+          candidate_id=$(podman image inspect --format '{{.Id}}' "$image")
+          test -n "$candidate_id"
+          sdk_major_minor=$(python3 - <<'PY'
+          import json
+          import re
+          sdk = json.load(open('fedora44-dotnet10/versions.json', encoding='utf-8'))['tools']['dotnet_sdk']
+          match = re.fullmatch(r'(\d+\.\d+)\.\d+', sdk)
+          if match is None:
+              raise SystemExit('invalid pinned .NET SDK version')
+          print(match.group(1))
+          PY
+          )
+          package=ghcr.io/thesereyn/hermes-dev-dotnet
+          version_ref="$package:$sdk_major_minor"
+          latest_ref="$package:latest"
+          authfile="$RUNNER_TEMP/ghcr-auth.json"
+          version_digest="$RUNNER_TEMP/ghcr-version.digest"
+          latest_digest="$RUNNER_TEMP/ghcr-latest.digest"
+          umask 077
+          cleanup_registry_auth() {
+            status=$?
+            set +e
+            if [ -f "$authfile" ]; then
+              podman logout --authfile "$authfile" ghcr.io >/dev/null
+              logout_status=$?
+            else
+              logout_status=0
+            fi
+            rm -f "$authfile"
+            remove_status=$?
+            if [ "$status" -eq 0 ]; then
+              [ "$logout_status" -eq 0 ] || status=$logout_status
+              [ "$remove_status" -eq 0 ] || status=$remove_status
+            fi
+            exit "$status"
+          }
+          trap cleanup_registry_auth EXIT
+          printf '%s' "$GHCR_TOKEN" | podman login --authfile "$authfile" --username "$GHCR_USER" --password-stdin ghcr.io
+          podman tag "$image" "$version_ref"
+          podman tag "$image" "$latest_ref"
+          podman push --authfile "$authfile" --format oci --digestfile "$version_digest" "$version_ref"
+          podman push --authfile "$authfile" --format oci --digestfile "$latest_digest" "$latest_ref"
+          cmp "$version_digest" "$latest_digest"
+          podman pull --authfile "$authfile" "$version_ref"
+          podman pull --authfile "$authfile" "$latest_ref"
+          version_id=$(podman image inspect --format '{{.Id}}' "$version_ref")
+          latest_id=$(podman image inspect --format '{{.Id}}' "$latest_ref")
+          test "$version_id" = "$candidate_id"
+          test "$latest_id" = "$candidate_id"
       - name: Scoped cleanup
         if: always()
         run: bash tests/cleanup.sh

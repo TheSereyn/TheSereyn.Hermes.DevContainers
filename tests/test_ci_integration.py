@@ -47,6 +47,39 @@ class CIIntegrationTests(unittest.TestCase):
                 for legacy in ('dotnet10-noble', 'playwright', 'chromium', 'test_npm_fixture'):
                     self.assertNotIn(legacy, joined)
 
+    def test_manual_build_publishes_the_scanned_candidate_only_after_scan(self):
+        import policy
+        workflow = yaml.load((ROOT / '.github/workflows/build.yml').read_text(), Loader=policy.WorkflowLoader)
+        self.assertEqual(workflow['on'], {'workflow_dispatch': None})
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        job = workflow['jobs']['build']
+        self.assertEqual(job['if'], "github.ref == 'refs/heads/main'")
+        self.assertEqual(job['permissions'], {'contents': 'read', 'packages': 'write'})
+        steps = job['steps']
+        names = [step.get('name') for step in steps]
+        build_index = names.index('Build and smoke test')
+        scan_index = names.index('All-layer scan')
+        publish_index = names.index('Publish exact candidate to GHCR')
+        cleanup_index = names.index('Scoped cleanup')
+        self.assertLess(build_index, scan_index)
+        build = steps[build_index]['run']
+        self.assertIn('tests/build.sh', build)
+        self.assertIn('tests/run-smoke.sh', build)
+        self.assertLess(scan_index, publish_index)
+        self.assertLess(publish_index, cleanup_index)
+        publish = steps[publish_index]
+        self.assertEqual(publish['if'], "success() && github.ref == 'refs/heads/main'")
+        self.assertEqual(publish['env'], {
+            'GHCR_USER': '${{ github.actor }}',
+            'GHCR_TOKEN': '${{ github.token }}',
+        })
+        script = publish['run']
+        for required in ('tests/owned_run.py image', 'podman login', '--password-stdin',
+                         'ghcr.io/thesereyn/hermes-dev-dotnet', 'podman push',
+                         'podman pull', 'candidate_id', 'cmp'):
+            self.assertIn(required, script)
+        self.assertNotIn('--password ', script)
+
     def test_shell_syntax_checks_each_script(self):
         steps = self.workflow('validate.yml')['jobs']['policy']['steps']
         scripts = [s['run'] for s in steps if s.get('name') == 'Shell syntax']

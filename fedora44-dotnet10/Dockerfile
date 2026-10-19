@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475 AS refreshed
+FROM registry.fedoraproject.org/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475 AS refreshed
 
 # Exclude the optional OpenH264 repository from this image.
 RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo \
@@ -39,11 +39,14 @@ RUN dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
 
 FROM python-tools AS devtools
 RUN dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
-      -y install gh azure-cli python3-antlr4-runtime ripgrep --setopt=install_weak_deps=False \
+      -y install gh azure-cli python3-antlr4-runtime ripgrep podman-remote --setopt=install_weak_deps=False \
  && dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
       -y upgrade --refresh --setopt=install_weak_deps=False \
  && dnf clean all \
- && rm -rf /var/cache/dnf
+ && rm -rf /var/cache/dnf \
+ && test -x /usr/bin/podman-remote \
+ && test ! -e /usr/local/bin/podman \
+ && ln -s /usr/bin/podman-remote /usr/local/bin/podman
 
 FROM devtools AS final
 WORKDIR /workspace
@@ -54,7 +57,7 @@ RUN test "$(sha256sum /usr/share/hermes-dev/rpm-packages.lock | cut -d' ' -f1)" 
  && rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > /tmp/installed-rpms \
  && python3 -c 'import pathlib,sys; expected=pathlib.Path("/usr/share/hermes-dev/rpm-packages.lock").read_text(); actual=pathlib.Path("/tmp/installed-rpms").read_text(); sys.exit(expected != actual)' \
  && rm -f /tmp/installed-rpms
-LABEL org.opencontainers.image.base.name="quay.io/fedora/fedora-minimal" \
+LABEL org.opencontainers.image.base.name="registry.fedoraproject.org/fedora-minimal" \
       org.opencontainers.image.base.digest="sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475" \
       org.thesereyn.package-lock.sha256="${PACKAGE_LOCK_SHA256}" \
       org.thesereyn.recipe.sha256="${RECIPE_SHA256}"

@@ -19,6 +19,8 @@ RECIPE_FILES = (
     CONTEXT / "rpm-packages.lock",
     CONTEXT / "tests/smoke.sh",
     ROOT / "tests/owned_run.py",
+    ROOT / "tests/podman_remote.py",
+    ROOT / "tests/run-podman-remote.sh",
 )
 
 
@@ -40,10 +42,16 @@ def recipe_sha256():
 
 
 class Runtime:
-    def __init__(self):
+    def __init__(self, neutral=False):
         self.command = os.environ.get("CONTAINER_RUNTIME", "podman")
+        self.env = dict(os.environ)
+        if neutral:
+            for key in ('CONTAINER_HOST', 'CONTAINER_CONNECTION', 'DOCKER_HOST',
+                        'CONTAINER_SSHKEY', 'PODMAN_CONNECTIONS_CONF'):
+                self.env.pop(key, None)
 
     def call(self, *args, **kwargs):
+        kwargs.setdefault('env', self.env)
         proc = subprocess.Popen([self.command, *map(str, args)], **kwargs)
         try:
             code = proc.wait()
@@ -59,7 +67,7 @@ class Runtime:
             raise RuntimeError("runtime command failed: " + str(args[0]))
 
     def output(self, *args):
-        return subprocess.check_output([self.command, *map(str, args)], text=True)
+        return subprocess.check_output([self.command, *map(str, args)], text=True, env=self.env)
 
     def inventory(self, kind):
         args = ("images", "-aq", "--no-trunc") if kind == "images" else ("ps", "-aq", "--no-trunc")
@@ -73,7 +81,7 @@ class Runtime:
 
     def remove(self, kind, identifier):
         if kind == "images":
-            self.call("rmi", identifier)
+            self.call("rmi", "--no-prune", identifier)
         else:
             self.call("rm", "-f", identifier)
 
@@ -90,6 +98,23 @@ class Runtime:
             raise RuntimeError("cannot verify tag absence: " + tag)
         self.call(*args, str(context))
         return json.loads(self.output("image", "inspect", tag))[0]["Id"]
+
+    def remote(self, token, image, socket_path, expected, base, directory, cleanup_only):
+        args = ['run', '--rm', '-i', '--pull=never', '--name', 'remote-client-' + token,
+                '--label', LABEL + '=' + token, '--network=none', '--read-only', '--cap-drop=ALL',
+                '--security-opt', 'no-new-privileges', '--memory=768m', '--cpus=1', '--pids-limit=128',
+                '--userns=keep-id', '--user', str(os.getuid()) + ':' + str(os.getgid()),
+                '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m', '-e', 'HOME=/tmp',
+                '-e', 'PYTHONDONTWRITEBYTECODE=1',
+                '-v', socket_path + ':/run/podman-remote.sock:ro',
+                '-v', str(directory) + ':/evidence:z', '--entrypoint=python3', image, '-',
+                '--ledger', '/evidence/remote.json', '--socket', '/run/podman-remote.sock',
+                '--expect-storage', expected, '--base-image', base]
+        if cleanup_only:
+            args.append('--cleanup-only')
+        with (ROOT / 'tests/podman_remote.py').open('rb') as stream, \
+                (directory / ('cleanup.log' if cleanup_only else 'workload.log')).open('ab') as log:
+            self.call(*args, stdin=stream, stdout=log, stderr=subprocess.STDOUT)
 
     def smoke(self, token, name, image, fixture, mode):
         home = "/root" if mode == "root" else "/home/tester"
@@ -141,21 +166,30 @@ class Run:
             os.fsync(stream.fileno())
         temporary.replace(self.path)
 
-    def reconcile(self, kind):
+    def save_cleanup(self, failures):
+        try:
+            self.save()
+        except OSError as error:
+            failures.append('evidence persistence failed: ' + str(error))
+
+    def reconcile(self, kind, persistence_failures=None):
         inventory = self.runtime.inventory(kind)
         owned = sorted(identifier for identifier, label in inventory.items()
                        if label == self.token and identifier not in self.data["baseline"][kind])
         self.data[kind] = sorted(set(self.data[kind]) | set(owned))
-        self.save()
+        if persistence_failures is None:
+            self.save()
+        else:
+            self.save_cleanup(persistence_failures)
         return owned
 
     def cleanup(self, containers_only=False):
         self.data["cleanup"] = "pending"
-        self.save()
-        kinds = ("containers",) if containers_only else ("containers", "images")
         failures = []
+        self.save_cleanup(failures)
+        kinds = ("containers",) if containers_only else ("containers", "images")
         for kind in kinds:
-            self.reconcile(kind)
+            self.reconcile(kind, failures)
             owned = sorted(set(self.data[kind]) - set(self.data["baseline"][kind]))
             for identifier in owned:
                 current = self.runtime.inventory(kind)
@@ -179,20 +213,67 @@ class Run:
                     if pathlib.Path(directory).exists():
                         shutil.rmtree(directory)
                     self.data["fixture_directories"].remove(directory)
-                    self.save()
+                    self.save_cleanup(failures)
         self.data["cleanup"] = "failed" if failures else ("containers-verified" if containers_only else "verified")
-        self.save()
+        self.save_cleanup(failures)
         if failures:
+            self.data["cleanup"] = "failed"
             raise RuntimeError("; ".join(failures))
 
     def build(self):
         try:
             self.data["image_id"] = self.runtime.build(self.token, self.data["image_tag"], CONTEXT)
             self.reconcile("images")
+            self.save()
         except BaseException:
             self.cleanup()
             raise
-        self.save()
+
+    def remote(self, socket_path, expected, base, cleanup_only=False):
+        from podman_remote import validate_inputs, validate_socket
+        validate_socket(socket_path)
+        validate_inputs(expected, base)
+        image = self.data.get('image_id')
+        if not image or self.runtime.inventory('images').get(image) != self.token:
+            raise ValueError('candidate must be an exact owned image from this build ledger')
+        binding = {'socket': socket_path, 'expect_storage': expected, 'base_image': base}
+        record = self.data.get('remote_test')
+        if record:
+            if any(record[key] != value for key, value in binding.items()):
+                raise ValueError('remote recovery target differs from recorded target')
+            if not cleanup_only:
+                raise ValueError('remote test already recorded; use --cleanup-only for recovery')
+        else:
+            if cleanup_only:
+                raise ValueError('no remote test recorded for recovery')
+            directory = tempfile.mkdtemp(prefix='podman-remote-', dir=self.path.resolve().parent)
+            record = dict(binding, directory=directory, status='pending')
+            self.data['remote_test'] = record
+            self.save()
+        directory = pathlib.Path(record['directory'])
+        if cleanup_only:
+            # An interrupted local CLI can leave the outer client container alive.
+            self.cleanup(containers_only=True)
+        try:
+            record['status'] = 'running'
+            self.save()
+            self.runtime.remote(self.token, image, socket_path, expected, base, directory, cleanup_only)
+            receipt = json.loads((directory / 'remote.json').read_text())
+            if receipt.get('cleanup') != 'verified' or (
+                    not cleanup_only and receipt.get('workload_status') != 'passed'):
+                raise RuntimeError('remote test has no verified workload/cleanup receipt')
+            record['status'] = 'cleanup-verified' if cleanup_only else 'passed'
+        except BaseException as error:
+            record['status'] = 'failed'
+            record['error'] = type(error).__name__ + ': ' + str(error)
+            raise
+        finally:
+            try:
+                self.save()
+            finally:
+                # Host containers only. Remote-service resources have a separate ledger.
+                # Evidence is deliberately not a disposable fixture_directory.
+                self.cleanup(containers_only=True)
 
     def smoke(self):
         directory = pathlib.Path(tempfile.mkdtemp(prefix="fedora44-smoke-"))
@@ -210,10 +291,27 @@ class Run:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=("build", "smoke", "cleanup", "image"))
-    parser.add_argument("ledger", type=pathlib.Path)
+    parser.add_argument("operation", choices=("build", "smoke", "cleanup", "image", "remote"))
+    parser.add_argument("ledger", type=pathlib.Path, nargs='?')
+    parser.add_argument('--ledger', dest='remote_ledger', type=pathlib.Path)
+    parser.add_argument('--socket')
+    parser.add_argument('--expect-storage')
+    parser.add_argument('--base-image')
+    parser.add_argument('--cleanup-only', action='store_true')
     args = parser.parse_args()
-    runtime = Runtime()
+    if args.operation == 'remote':
+        from podman_remote import validate_inputs, validate_socket
+        if args.ledger or not all((args.remote_ledger, args.socket, args.expect_storage, args.base_image)):
+            parser.error('remote requires --ledger, --socket, --expect-storage and --base-image')
+        try:
+            validate_socket(args.socket)
+            validate_inputs(args.expect_storage, args.base_image)
+        except ValueError as error:
+            parser.error(str(error))
+        args.ledger = args.remote_ledger
+    elif args.ledger is None:
+        parser.error('ledger is required')
+    runtime = Runtime(neutral=args.operation == 'remote')
     run = Run.create(args.ledger, runtime) if args.operation == "build" else Run.load(args.ledger, runtime)
 
     def interrupted(signum, frame):
@@ -223,6 +321,8 @@ def main():
     signal.signal(signal.SIGHUP, interrupted)
     if args.operation == "image":
         print(run.data["image_id"])
+    elif args.operation == 'remote':
+        run.remote(args.socket, args.expect_storage, args.base_image, args.cleanup_only)
     else:
         getattr(run, args.operation)()
 

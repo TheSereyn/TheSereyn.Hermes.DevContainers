@@ -75,7 +75,7 @@ class FedoraMigrationTests(unittest.TestCase):
 
     def test_locked_rpm_inventory_matches_the_baseline_count(self):
         packages = (IMAGE / "rpm-packages.lock").read_text().splitlines()
-        self.assertEqual(len(packages), 293)
+        self.assertEqual(len(packages), 309)
         self.assertEqual(packages, sorted(set(packages)))
         self.assertTrue(any(package.startswith("azure-cli-") for package in packages))
         self.assertTrue(any(package.startswith("dotnet-sdk-10.0-") for package in packages))

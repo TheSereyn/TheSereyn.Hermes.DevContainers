@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import unittest
 
+import yaml
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class BuildPolicyTests(unittest.TestCase):
@@ -21,6 +23,138 @@ class BuildPolicyTests(unittest.TestCase):
         for payload in ['permissions: {packages: write}', 'run: docker push image', 'uses: docker/login-action@abc', 'on: pull_request_target', 'persist-credentials: true', 'uses: actions/checkout@v4']:
             with self.subTest(payload=payload):
                 self.assertTrue(module.check_workflow(payload))
+
+    def test_build_workflow_publication_contract_is_narrow(self):
+        import policy
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        self.assertEqual(policy.check_workflow(workflow, allow_image_publication=True), [])
+        self.assertTrue(policy.check_workflow(workflow))
+        for bad in [
+            workflow.replace("workflow_dispatch:", "push:\n    branches: [main]\n  workflow_dispatch:", 1),
+            workflow.replace("if: success() && github.ref == 'refs/heads/main'", "if: always()", 1),
+            workflow.replace("packages: write", "packages: write, id-token: write", 1),
+            workflow.replace("GHCR_TOKEN: ${{ github.token }}", "GHCR_TOKEN: ${{ secrets.PAT }}", 1),
+            workflow.replace("--password-stdin", "--password \\\"$GHCR_TOKEN\\\"", 1),
+        ]:
+            with self.subTest(workflow=bad):
+                self.assertTrue(policy.check_workflow(bad, allow_image_publication=True))
+        malformed = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        scan = next(step for step in malformed['jobs']['build']['steps']
+                    if step.get('name') == 'All-layer scan')
+        scan['run'] = None
+        self.assertTrue(policy.check_workflow(yaml.safe_dump(malformed, sort_keys=False),
+                                              allow_image_publication=True))
+        malformed_cleanup = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        cleanup = next(step for step in malformed_cleanup['jobs']['build']['steps']
+                       if step.get('name') == 'Scoped cleanup')
+        cleanup['run'] = None
+        self.assertTrue(policy.check_workflow(yaml.safe_dump(malformed_cleanup, sort_keys=False),
+                                              allow_image_publication=True))
+
+    def test_publication_requires_build_and_smoke_before_scan(self):
+        import policy
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        mutants = []
+        missing_build = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        missing_build['jobs']['build']['steps'] = [
+            step for step in missing_build['jobs']['build']['steps']
+            if step.get('name') != 'Build and smoke test']
+        mutants.append(missing_build)
+
+        missing_smoke = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        build_step = next(step for step in missing_smoke['jobs']['build']['steps']
+                          if step.get('name') == 'Build and smoke test')
+        build_step['run'] = build_step['run'].replace('bash tests/run-smoke.sh', '')
+        mutants.append(missing_smoke)
+
+        scan_before_build = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        steps = scan_before_build['jobs']['build']['steps']
+        build_index = next(i for i, step in enumerate(steps)
+                           if step.get('name') == 'Build and smoke test')
+        scan_index = next(i for i, step in enumerate(steps)
+                          if step.get('name') == 'All-layer scan')
+        steps[build_index], steps[scan_index] = steps[scan_index], steps[build_index]
+        mutants.append(scan_before_build)
+
+        build_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in build_continue['jobs']['build']['steps']
+             if step.get('name') == 'Build and smoke test')['continue-on-error'] = True
+        mutants.append(build_continue)
+
+        scan_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in scan_continue['jobs']['build']['steps']
+             if step.get('name') == 'All-layer scan')['continue-on-error'] = True
+        mutants.append(scan_continue)
+
+        source_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in source_continue['jobs']['build']['steps']
+             if step.get('name') == 'Source tests')['continue-on-error'] = True
+        mutants.append(source_continue)
+
+        reports_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in reports_continue['jobs']['build']['steps']
+             if step.get('name') == 'Prepare public scan reports')['continue-on-error'] = True
+        mutants.append(reports_continue)
+
+        retention_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in retention_continue['jobs']['build']['steps']
+             if step.get('name') == 'Retain scan reports')['continue-on-error'] = True
+        mutants.append(retention_continue)
+
+        job_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        job_continue['jobs']['build']['continue-on-error'] = True
+        mutants.append(job_continue)
+
+        publish_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in publish_continue['jobs']['build']['steps']
+             if step.get('name') == 'Publish exact candidate to GHCR')['continue-on-error'] = True
+        mutants.append(publish_continue)
+
+        cleanup_continue = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        next(step for step in cleanup_continue['jobs']['build']['steps']
+             if step.get('name') == 'Scoped cleanup')['continue-on-error'] = True
+        mutants.append(cleanup_continue)
+
+        for malformed in mutants:
+            with self.subTest(steps=[step.get('name') for step in malformed['jobs']['build']['steps']]):
+                text = yaml.safe_dump(malformed, sort_keys=False)
+                self.assertTrue(policy.check_workflow(text, allow_image_publication=True))
+
+    def test_publication_token_is_confined_to_publish_step(self):
+        import policy
+        workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        mutations = []
+        step_token = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        source_tests = next(step for step in step_token['jobs']['build']['steps']
+                            if step.get('name') == 'Source tests')
+        source_tests['env'] = {'UNEXPECTED_TOKEN': '${{ github.token }}'}
+        mutations.append(step_token)
+
+        step_secret = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        source_tests = next(step for step in step_secret['jobs']['build']['steps']
+                            if step.get('name') == 'Source tests')
+        source_tests['env'] = {'OTHER_CREDENTIAL': '${{ secrets.GITHUB_TOKEN }}'}
+        mutations.append(step_secret)
+
+        job_token = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        job_token['jobs']['build']['env'] = {'GHCR_TOKEN': '${{ github.token }}'}
+        mutations.append(job_token)
+
+        workflow_token = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        workflow_token['env'] = {'GHCR_TOKEN': '${{ github.token }}'}
+        mutations.append(workflow_token)
+
+        job_secret = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        job_secret['jobs']['build']['env'] = {'OTHER_CREDENTIAL': '${{ secrets.GITHUB_TOKEN }}'}
+        mutations.append(job_secret)
+
+        workflow_secret = yaml.load(workflow, Loader=policy.WorkflowLoader)
+        workflow_secret['env'] = {'OTHER_CREDENTIAL': '${{ secrets.GITHUB_TOKEN }}'}
+        mutations.append(workflow_secret)
+
+        for malformed in mutations:
+            text = yaml.safe_dump(malformed, sort_keys=False)
+            self.assertTrue(policy.check_workflow(text, allow_image_publication=True))
 
     def test_rejects_review_workflow_bypasses(self):
         import policy

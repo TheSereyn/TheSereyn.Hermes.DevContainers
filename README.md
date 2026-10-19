@@ -17,17 +17,20 @@ Vulnerability scans report known issues, including Critical and High findings. T
 - Node.js 24 and npm
 - Python 3, `venv`, and `uv`
 - Git, GitHub CLI, Azure CLI, ripgrep, Bash, OpenSSH client, curl, and CA certificates
+- Podman remote client, available as `podman` and `podman-remote`
 
 Exact package versions are recorded in [`fedora44-dotnet10/versions.json`](fedora44-dotnet10/versions.json) and [`fedora44-dotnet10/rpm-packages.lock`](fedora44-dotnet10/rpm-packages.lock). The build uses Fedora's `fedora` and `updates` repositories. It removes the optional OpenH264 repository and does not add Microsoft or GitHub package repositories.
 
 The image provides `python3`, not a `python` alias. System pip is not installed. Create a virtual environment with `python3 -m venv` to use pip for project dependencies. The image does not include Playwright or a browser runtime.
 
+The Podman client connects to an external API service. Socket mounting, permissions and endpoint selection are configured by the runtime; the image does not include a container engine or a default socket. See [Podman remote client](docs/podman-remote.md).
+
 ## Build
 
-The build script creates a local Podman image tagged `localhost/hermes-dev-dotnet:10.0` and updates `localhost/hermes-dev-dotnet:latest` by default. It does not publish an image to a registry.
+The build script creates a local Podman image tagged `localhost/hermes-dev-dotnet:10.0` and updates `localhost/hermes-dev-dotnet:latest` by default. It does not publish an image to a registry. A separate manual GitHub Actions workflow builds, tests, scans, and publishes the exact candidate to GHCR. See [build and test](docs/build-and-test.md) for its gates and tags.
 
 ```sh
-podman pull quay.io/fedora/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475
+podman pull registry.fedoraproject.org/fedora-minimal@sha256:694cfd38a85e4c48bae777d37e4ca8d5f0ee0dd36ace04294f23b72bf9bd3475
 bash fedora44-dotnet10/build-local.sh
 ```
 
@@ -80,4 +83,4 @@ podman run --rm -it \
 
 On SELinux systems, add `:Z` to the volume option if the container cannot access the mounted project directory.
 
-The image scan dated 2026-10-13 found vulnerability matches. See the [vulnerability register](docs/vulnerabilities.md) for findings and update statuses, and [third-party notices](docs/third-party-notices.md) for supplier information.
+The image scan dated 2026-10-19 found vulnerability matches. See the [vulnerability register](docs/vulnerabilities.md) for findings and update statuses, and [third-party notices](docs/third-party-notices.md) for supplier information.
