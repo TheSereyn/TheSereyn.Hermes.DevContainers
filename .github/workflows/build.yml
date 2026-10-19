@@ -80,9 +80,22 @@ jobs:
           version_digest="$RUNNER_TEMP/ghcr-version.digest"
           latest_digest="$RUNNER_TEMP/ghcr-latest.digest"
           umask 077
+          version_alias_owned=0
+          latest_alias_owned=0
           cleanup_registry_auth() {
             status=$?
             set +e
+            # Untag only aliases reserved by this step, never the owned run tag.
+            if [ "$version_alias_owned" -eq 1 ]; then
+              podman untag "$candidate_id" "$version_ref"
+              alias_status=$?
+              [ "$status" -ne 0 ] || status=$alias_status
+            fi
+            if [ "$latest_alias_owned" -eq 1 ]; then
+              podman untag "$candidate_id" "$latest_ref"
+              alias_status=$?
+              [ "$status" -ne 0 ] || status=$alias_status
+            fi
             if [ -f "$authfile" ]; then
               podman logout --authfile "$authfile" ghcr.io >/dev/null
               logout_status=$?
@@ -98,8 +111,20 @@ jobs:
             exit "$status"
           }
           trap cleanup_registry_auth EXIT
+          # Refuse pre-existing local aliases rather than overwrite or remove them.
+          for ref in "$version_ref" "$latest_ref"; do
+            if podman image exists "$ref"; then
+              printf 'refusing existing local publication alias: %s\n' "$ref" >&2
+              exit 1
+            else
+              exists_status=$?
+              [ "$exists_status" -eq 1 ] || exit "$exists_status"
+            fi
+          done
           printf '%s' "$GHCR_TOKEN" | podman login --authfile "$authfile" --username "$GHCR_USER" --password-stdin ghcr.io
+          version_alias_owned=1
           podman tag "$image" "$version_ref"
+          latest_alias_owned=1
           podman tag "$image" "$latest_ref"
           podman push --authfile "$authfile" --format oci --digestfile "$version_digest" "$version_ref"
           podman push --authfile "$authfile" --format oci --digestfile "$latest_digest" "$latest_ref"

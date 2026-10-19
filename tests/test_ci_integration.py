@@ -1,5 +1,7 @@
 """Execute CI scan wiring with inert engine/scanner seams, never containers."""
+import json
 import os
+import sys
 from pathlib import Path
 import subprocess
 import tempfile
@@ -79,6 +81,96 @@ class CIIntegrationTests(unittest.TestCase):
                          'podman pull', 'candidate_id', 'cmp'):
             self.assertIn(required, script)
         self.assertNotIn('--password ', script)
+
+    def test_publication_removes_only_owned_local_aliases_even_on_failure(self):
+        script = next(s['run'] for s in self.workflow('build.yml')['jobs']['build']['steps']
+                      if s.get('name') == 'Publish exact candidate to GHCR')
+        package = 'ghcr.io/thesereyn/hermes-dev-dotnet'
+        version, latest = package + ':10.0', package + ':latest'
+        original = 'localhost/hermes-dev-dotnet:run-original-token'
+        engine_script = r'''import json, os, pathlib, sys
+args = sys.argv[1:]
+path = pathlib.Path(os.environ['ENGINE_STATE'])
+state = json.loads(path.read_text())
+state['calls'].append(args)
+refs = state['refs']
+code, output = 0, ''
+if args[:2] == ['image', 'exists']:
+    code = 125 if state['fail'] == 'exists' else (0 if args[-1] in refs else 1)
+elif args[:2] == ['image', 'inspect']:
+    output = refs.get(args[-1], '')
+    code = 0 if output else 1
+elif args[0] == 'login':
+    pathlib.Path(args[args.index('--authfile') + 1]).write_text('private fixture')
+    code = 21 if state['fail'] == 'login' else 0
+elif args[0] == 'logout':
+    code = 22 if state['fail'] == 'logout' else 0
+elif args[0] == 'tag':
+    refs[args[-1]] = refs[args[1]]
+    code = 23 if state['fail'] == 'tag' and args[-1].endswith(':latest') else 0
+elif args[0] == 'push':
+    pathlib.Path(args[args.index('--digestfile') + 1]).write_text('sha256:fixture')
+    code = 24 if state['fail'] == 'push' and args[-1].endswith(':latest') else 0
+elif args[0] == 'pull':
+    if state['fail'] == 'verify' and args[-1].endswith(':latest'):
+        refs[args[-1]] = 'different-image'
+elif args[0] == 'untag':
+    if state['fail'] == 'untag':
+        code = 25
+    elif refs.get(args[-1]) == args[1]:
+        del refs[args[-1]]
+    else:
+        code = 26
+else:
+    code = 99
+path.write_text(json.dumps(state))
+if output:
+    print(output)
+sys.exit(code)
+'''
+        for failure in ('', 'login', 'tag', 'push', 'logout', 'exists',
+                        'existing-version', 'existing-latest', 'verify', 'untag'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
+                base = Path(temp)
+                (base / 'tests').mkdir()
+                (base / 'bin').mkdir()
+                (base / 'fedora44-dotnet10').mkdir()
+                (base / 'tests/owned_run.py').write_text('print(' + repr(original) + ')\n')
+                (base / 'fedora44-dotnet10/versions.json').write_text(
+                    json.dumps({'tools': {'dotnet_sdk': '10.0.100'}}))
+                engine = base / 'bin/podman'
+                engine.write_text('#!' + sys.executable + '\n' + engine_script)
+                engine.chmod(0o700)
+                refs = {original: 'candidate-id', 'localhost/unrelated:keep': 'other-id'}
+                if failure.startswith('existing-'):
+                    refs[version if failure == 'existing-version' else latest] = 'unowned-id'
+                state_path = base / 'state.json'
+                state_path.write_text(json.dumps({'refs': refs, 'calls': [], 'fail': failure}))
+                env = dict(os.environ, RUNNER_TEMP=temp, OWNERSHIP_LEDGER='fixture',
+                           GHCR_USER='fixture', GHCR_TOKEN='inert-token',
+                           ENGINE_STATE=str(state_path), PATH=str(base / 'bin') + ':' + os.environ['PATH'])
+                result = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script],
+                                        cwd=base, env=env, capture_output=True, text=True)
+                state = json.loads(state_path.read_text())
+                self.assertEqual(result.returncode == 0, not failure, result.stderr)
+                expected = dict(refs)
+                if failure == 'verify':
+                    expected[latest] = 'different-image'
+                elif failure == 'untag':
+                    expected.update({version: 'candidate-id', latest: 'candidate-id'})
+                self.assertEqual(state['refs'], expected, state['calls'])
+                self.assertFalse((base / 'ghcr-auth.json').exists())
+                calls = state['calls']
+                self.assertFalse(any(c[0] in ('rmi', 'rm') or '--force' in c for c in calls))
+                if failure.startswith('existing-') or failure == 'exists':
+                    self.assertFalse(any(c[0] in ('tag', 'push', 'pull', 'untag', 'login') for c in calls))
+                if not failure:
+                    last_inspect = max(i for i, c in enumerate(calls) if c[:2] == ['image', 'inspect'])
+                    self.assertTrue(all(i > last_inspect for i, c in enumerate(calls) if c[0] == 'untag'))
+                    self.assertEqual({c[-1] for c in calls if c[0] == 'untag'}, {version, latest})
+                if failure in ('login', 'tag', 'push', 'logout', 'untag'):
+                    self.assertEqual(result.returncode, {'login': 21, 'tag': 23, 'push': 24,
+                                                         'logout': 22, 'untag': 25}[failure])
 
     def test_shell_syntax_checks_each_script(self):
         steps = self.workflow('validate.yml')['jobs']['policy']['steps']
