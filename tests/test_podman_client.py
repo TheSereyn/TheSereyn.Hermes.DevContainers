@@ -8,6 +8,17 @@ IMAGE = ROOT / 'fedora44-dotnet10'
 
 
 class PodmanClientTests(unittest.TestCase):
+    def test_docker_cli_is_added_without_a_daemon(self):
+        import json
+        recipe = (IMAGE / 'Dockerfile').read_text()
+        self.assertRegex(recipe, r'install [^\n]*\bdocker-cli\b')
+        self.assertNotRegex(recipe, r'install [^\n]*\bmoby-engine\b')
+        metadata = json.loads((IMAGE / 'versions.json').read_text())
+        self.assertEqual(metadata['tools']['docker_cli'], '29.8.2')
+        packages = (IMAGE / 'rpm-packages.lock').read_text().splitlines()
+        self.assertIn('docker-cli-0:29.8.2-2.fc44.x86_64', packages)
+        self.assertIn('moby-filesystem-0:29.8.2-2.fc44.noarch', packages)
+
     def test_recipe_installs_only_the_remote_cli_and_exposes_podman(self):
         recipe = (IMAGE / 'Dockerfile').read_text()
         logical = re.sub(r'\\\n\s*', ' ', recipe)
@@ -15,7 +26,7 @@ class PodmanClientTests(unittest.TestCase):
         for install in re.findall(r'\binstall\s+([^&\n]+)', logical):
             packages.extend(token for token in shlex.split(install) if not token.startswith('-'))
         self.assertIn('podman-remote', packages)
-        self.assertFalse(set(packages) & {'podman', 'buildah', 'docker', 'docker-cli', 'podman-compose', 'docker-compose'})
+        self.assertFalse(set(packages) & {'podman', 'buildah', 'docker', 'moby-engine', 'podman-compose', 'docker-compose'})
         self.assertIn('test -x /usr/bin/podman-remote', logical)
         self.assertIn('test ! -e /usr/local/bin/podman', logical)
         self.assertIn('ln -s /usr/bin/podman-remote /usr/local/bin/podman', logical)

@@ -26,7 +26,8 @@
     "github_cli": "2.97.0",
     "azure_cli": "2.83.0",
     "ripgrep": "15.2.0",
-    "podman_remote": "5.8.9"
+    "podman_remote": "5.8.9",
+    "docker_cli": "29.8.2"
   },
   "package_lock": "rpm-packages.lock",
   "browser_runtime": false
