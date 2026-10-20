@@ -39,7 +39,7 @@ RUN dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
 
 FROM python-tools AS devtools
 RUN dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
-      -y install gh azure-cli python3-antlr4-runtime ripgrep podman-remote --setopt=install_weak_deps=False \
+      -y install gh azure-cli python3-antlr4-runtime ripgrep podman-remote docker-cli --setopt=install_weak_deps=False \
  && dnf --disable-repo='*' --enable-repo=fedora --enable-repo=updates \
       -y upgrade --refresh --setopt=install_weak_deps=False \
  && dnf clean all \

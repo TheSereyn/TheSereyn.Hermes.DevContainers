@@ -18,12 +18,15 @@ Vulnerability scans report known issues, including Critical and High findings. T
 - Python 3, `venv`, and `uv`
 - Git, GitHub CLI, Azure CLI, ripgrep, Bash, OpenSSH client, curl, and CA certificates
 - Podman remote client, available as `podman` and `podman-remote`
+- Docker-compatible CLI from Fedora's `docker-cli` package, available as `docker`
 
 Exact package versions are recorded in [`fedora44-dotnet10/versions.json`](fedora44-dotnet10/versions.json) and [`fedora44-dotnet10/rpm-packages.lock`](fedora44-dotnet10/rpm-packages.lock). The build uses Fedora's `fedora` and `updates` repositories. It removes the optional OpenH264 repository and does not add Microsoft or GitHub package repositories.
 
 The image provides `python3`, not a `python` alias. System pip is not installed. Create a virtual environment with `python3 -m venv` to use pip for project dependencies. The image does not include Playwright or a browser runtime.
 
 The Podman client connects to an external API service. Socket mounting, permissions and endpoint selection are configured by the runtime; the image does not include a container engine or a default socket. See [Podman remote client](docs/podman-remote.md).
+
+The Docker CLI also requires an external engine. Consumers must supply its socket or configure a Docker context or `DOCKER_HOST`. The image does not start Docker Engine and does not include Compose or Buildx plugins. Installing either CLI does not grant host-engine access.
 
 ## Build
 
